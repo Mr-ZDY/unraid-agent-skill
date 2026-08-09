@@ -136,6 +136,50 @@ $ python3 op_deploy.py deploy whoami --port 9006 --yes   # CA 部署（确认门
 
 ---
 
+## ⚙️ 配置文件说明（profiles.json）
+
+多实例配置存放在 `~/.unraid/profiles.json`（权限 600，`install.sh` 自动生成，也可用 `python3 conf.py add <名称> <url>` 手动添加）：
+
+```json
+{
+  "prod": {
+    "url": "http://192.0.2.100/graphql",
+    "key_file": "/home/你的用户/.unraid/keys/192.0.2.100.key",
+    "ssh_key": "/home/你的用户/.unraid/ssh/id_ed25519",
+    "ssh_user": "root",
+    "verify_ssl": false,
+    "timeout": 15
+  }
+}
+```
+
+| 字段 | 说明 |
+|---|---|
+| `url` | unRAID GraphQL 端点（WebGUI 同源端口，如 `http://<IP>/graphql`） |
+| `key_file` | API 密钥文件路径（`install.sh` 写入，600 权限） |
+| `ssh_key` | SSH 私钥路径（部署 / GPU / 风扇 / 磁盘模块需要） |
+| `ssh_user` | SSH 登录用户（默认 root） |
+| `verify_ssl` | 自签证书环境设 `false` |
+| `timeout` | 请求超时秒数 |
+
+> 多台服务器 = 多个 profile，用 `--server <名称>` 切换（如 `python3 info_array.py --server backup`）。
+
+---
+
+## 🧹 卸载 / 重置
+
+```bash
+# 1. 删除本机配置与缓存（profiles / 密钥 / SSH 密钥 / 审计日志 / CA 缓存）
+rm -rf ~/.unraid
+
+# 2. 撤销 unRAID 侧权限
+#    - API 密钥：WebGUI → 设置 → 管理访问 → API 密钥 → 删除
+#    - SSH 公钥：unRAID 终端执行（只删本 skill 的 key，不影响其他）
+sed -i '/unraid-agent-skill/d' /root/.ssh/authorized_keys
+```
+
+---
+
 ## 🧩 版本兼容性
 
 | unRAID 版本 | 状态 |
