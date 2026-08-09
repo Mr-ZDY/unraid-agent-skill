@@ -166,11 +166,22 @@ def main():
     ap = argparse.ArgumentParser(description="unRAID API 连通性/版本/capability 自检")
     ap.add_argument("--server", default="prod")
     ap.add_argument("--compat", action="store_true", help="capability 自检（版本+关键字段）")
+    ap.add_argument("--json", action="store_true", help="JSON 输出（Agent 消费用）")
     args = ap.parse_args()
     try:
         c = UnraidClient(args.server)
         if args.compat:
             r = c.check_compat()
+            if args.json:
+                print(json.dumps({
+                    "unraid": r["unraid"],
+                    "api": r["api"],
+                    "status": r["status"],
+                    "version_status": r.get("version_status", ""),
+                    "checks": {k: "OK" if str(v) == "✓" else str(v) for k, v in r["checks"].items()},
+                    "warnings": r["warnings"],
+                }, ensure_ascii=False, indent=2))
+                sys.exit(1 if r["status"] == "REFUSED" else 0)
             print(f"unRAID {r['unraid']} | API {r['api']} | 状态: {r['status']}")
             print(f"版本状态: {r.get('version_status', '-')}")
             print("schema 字段抽查:")

@@ -252,7 +252,7 @@ unraid-agent-skill/
 
 ## 🗺️ 路线图
 
-- **v1.1**：文件写操作 / 共享配置修改 / 校验检查发起 / VM 管理 / Permission Policy（操作白名单 + 三级风险）/ Mock unRAID 测试（Golden+Fuzz）/ 哈希链审计日志 / 结构化返回协议（JSON action 结果）
+- **v1.1**：文件写操作 / 共享配置修改 / 校验检查发起 / VM 管理 / Permission Policy（操作白名单 + 三级风险 + 高危输入短语确认如 "CONFIRM DELETE plex"）/ Mock unRAID 测试（Golden+Fuzz）/ 哈希链审计日志 / 结构化返回协议（JSON action 结果 + **Operation ID** 全链路追踪）/ 非 root SSH 操作用户
 - **后续**：影视库适配器（Plex / Jellyfin）/ 接入 Hermes 长期会话 / **MCP Server 化**（Skill + MCP，兼容 Claude/OpenClaw/Cursor）/ 操作回滚（docker update 前快照）/ 审计 Agent Identity / CI 加固（bandit）
 - **最后一版**：电源管理（重启 / 关机，双重确认）/ 签名发布
 
