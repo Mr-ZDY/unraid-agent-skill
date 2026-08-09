@@ -21,6 +21,20 @@ import subprocess
 import sys
 import time
 import urllib.request
+
+# Docker 容器名白名单（纵深防御：任何进入 shell 命令的容器名/应用名必须先过校验）
+# Docker daemon 规则：字母数字开头，仅 [A-Za-z0-9_.-]，最长 63
+_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
+
+
+def validate_name(name: str) -> str:
+    """校验容器名/应用名，非法字符（含 shell 元字符）直接拒绝。"""
+    n = name.lstrip("/")
+    if not _NAME_RE.match(n):
+        raise ValueError(
+            f"非法名称: {name!r}（仅允许字母/数字/_.-，防止 shell 注入）"
+        )
+    return n
 import xml.etree.ElementTree as ET
 
 import confirm
@@ -379,6 +393,11 @@ def cmd_remove(args):
         sys.exit(1)
 
     name = (ct.get("names") or ["?"])[0]
+    try:
+        name = validate_name(name)
+    except ValueError as e:
+        print(f"✗ {e}")
+        sys.exit(1)
     mounts = ct.get("mounts") or []
     mount_lines = "\n".join(f"      {m.get('Source','?')} → {m.get('Destination','?')}" for m in mounts) if mounts else "      (无数据卷)"
     summary = (f"容器: {name}\n"

@@ -28,6 +28,31 @@
 
 > 🎯 **定位**：只读运维助手 + 容器常规管理。危险操作（电源管理、阵列变更）不在范围，人工处理。
 
+> ⚠️ **风险声明**：本工具具有修改 NAS 状态的能力，请勿将未经验证的 Agent 会话授予生产数据权限；部署第三方容器前请核实镜像来源（默认强制 CA 官方应用 + 来源分级提示）。
+
+---
+
+## 🏗️ 架构
+
+```
+AI Agent (Hermes / Claude / ...)
+        │
+        │ 调用 CLI 脚本（确认门：写操作先展示摘要，显式确认才执行）
+        ▼
+┌─────────────────────────────┐
+│      unraid-agent-skill     │
+│  info_*.py   op_docker.py   │
+│  op_deploy.py  unraid_api   │
+└──────────────┬──────────────┘
+       ┌───────┴────────┐
+       ▼                ▼
+  GraphQL API        SSH (部署/GPU/风扇/磁盘)
+  (x-api-key)        (密钥认证)
+       │                │
+       ▼                ▼
+  unRAID 内置 API    Host OS (docker CLI / smartctl / lm-sensors)
+```
+
 ---
 
 ## 🚀 快速开始
@@ -199,6 +224,9 @@ SSH 类模块（GPU / 风扇 / 磁盘）基于 smartctl / lm-sensors，**版本�
 unraid-agent-skill/
 ├── install.sh          # 安装引导（服务器 / 密钥 / SSH / 验证）
 ├── SKILL.md            # 技能声明（Agent 加载用）
+├── SECURITY.md         # 安全说明 / 漏洞报告
+├── CONTRIBUTING.md     # 贡献指南
+├── CHANGELOG.md        # 变更日志
 ├── scripts/            # 16 个 Python 模块（纯标准库）
 │   ├── unraid_api.py   # GraphQL 客户端（认证/重试/错误映射/兼容自检）
 │   ├── auth.py         # 密钥管理 + 输出脱敏
@@ -206,15 +234,15 @@ unraid-agent-skill/
 │   ├── info_*.py       # 9 个只读查询模块
 │   └── op_*.py         # 容器管理 / CA 部署
 ├── docs/               # API 查询清单 + 操作清单（含踩坑记录）
-└── tests/              # 单元测试
+└── tests/              # 单元测试 + 安全测试
 ```
 
 ---
 
 ## 🗺️ 路线图
 
-- **v1.1**：文件写操作 / 共享配置修改 / 校验检查发起 / VM 管理
-- **后续**：影视库适配器（Plex / Jellyfin）/ 接入 Hermes 长期会话
+- **v1.1**：文件写操作 / 共享配置修改 / 校验检查发起 / VM 管理 / Permission Policy（操作白名单）/ Mock unRAID 测试 / 哈希链审计日志
+- **后续**：影视库适配器（Plex / Jellyfin）/ 接入 Hermes 长期会话 / CI 加固（bandit）
 - **最后一版**：电源管理（重启 / 关机，双重确认）
 
 ---
