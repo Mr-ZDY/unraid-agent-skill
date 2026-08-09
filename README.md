@@ -159,6 +159,17 @@ $ python3 op_deploy.py deploy whoami --port 9006 --yes   # CA 部署（确认门
 4. **输出脱敏**：密钥 / 密码 / token 自动打码，不落日志
 5. **多实例**：`profiles.json` 支持多台 unRAID 服务器
 
+## 🛡️ Threat Model（威胁模型）
+
+| 威胁 | 防护 |
+|---|---|
+| **Prompt Injection**（Agent 被诱导执行危险操作） | 写操作全走确认门；SKILL.md 明示危险操作一律人工 |
+| **命令注入**（恶意容器名 / 参数） | `validate_name` 白名单校验；SSH 只执行代码内固定命令模板，**LLM 永不生成 shell** |
+| **权限越界**（只读会话拿到写能力） | API 密钥角色分级（VIEWER 只读 / ADMIN 管理）；`--compat` 校验 |
+| **Secret 泄露**（密钥进配置 / 日志 / 输出） | 密钥仅存 600 文件，配置只引用路径；输出经 auth.redact 脱敏；审计不含凭据 |
+| **供应链风险**（恶意第三方应用 / Skill 描述） | CA 来源分级强制提示；第三方安装必须用户显式许可 |
+| **版本漂移**（unRAID 升级导致 API 破坏） | `<7.2` 拒绝；`--compat` 字段级自检预警 |
+
 ---
 
 ## ⚙️ 配置文件说明（profiles.json）
@@ -241,9 +252,9 @@ unraid-agent-skill/
 
 ## 🗺️ 路线图
 
-- **v1.1**：文件写操作 / 共享配置修改 / 校验检查发起 / VM 管理 / Permission Policy（操作白名单）/ Mock unRAID 测试 / 哈希链审计日志
-- **后续**：影视库适配器（Plex / Jellyfin）/ 接入 Hermes 长期会话 / CI 加固（bandit）
-- **最后一版**：电源管理（重启 / 关机，双重确认）
+- **v1.1**：文件写操作 / 共享配置修改 / 校验检查发起 / VM 管理 / Permission Policy（操作白名单 + 三级风险）/ Mock unRAID 测试（Golden+Fuzz）/ 哈希链审计日志 / 结构化返回协议（JSON action 结果）
+- **后续**：影视库适配器（Plex / Jellyfin）/ 接入 Hermes 长期会话 / **MCP Server 化**（Skill + MCP，兼容 Claude/OpenClaw/Cursor）/ 操作回滚（docker update 前快照）/ 审计 Agent Identity / CI 加固（bandit）
+- **最后一版**：电源管理（重启 / 关机，双重确认）/ 签名发布
 
 ---
 
