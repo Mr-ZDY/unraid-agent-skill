@@ -16,9 +16,6 @@ import sys
 import unraid_api
 import utils
 
-SSH_KEY = os.path.expanduser("~/.unraid/ssh/id_ed25519")
-SSH_USER = "root"
-
 REMOTE_SCRIPT = r'''
 echo "===GPUHOST==="
 if command -v nvidia-smi >/dev/null 2>&1; then
@@ -44,6 +41,11 @@ done
 
 def ssh_run(server: str, script: str, timeout: int = 60) -> tuple[int, str, str]:
     cfg = unraid_api.conf.get_ssh(server)
+    if not cfg["key"] or not os.path.exists(cfg["key"]):
+        print("⚠ 最小权限模式（未配置 SSH）：此模块不可用。")
+        print("  当前 profile 仅使用 GraphQL API（只读查询 + 容器管理已覆盖 90% 需求）。")
+        print("  如需 GPU/风扇/磁盘/CA 部署能力，见 README「部署模式」章节配置 SSH。")
+        sys.exit(2)
     cmd = ["ssh", "-i", cfg["key"], "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes",
            "-o", "ConnectTimeout=8", f"{cfg['user']}@{cfg['host']}", "bash -s"]
     p = subprocess.run(cmd, input=script, capture_output=True, text=True, timeout=timeout)

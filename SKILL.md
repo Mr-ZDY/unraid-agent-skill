@@ -5,19 +5,22 @@ description: >
   SMART, parity), shares/disk usage, Docker containers, VMs, notifications, logs,
   or wants to start/stop/restart/update containers, or deploy/remove containers
   via Community Applications. Requires unRAID 7.2+ (built-in GraphQL API) and an
-  API key + SSH key on the WSL host. All write operations require user approval.
-version: 1.0.0
+  API key on the WSL host (SSH key optional, only for CA deploy / GPU / fan / disk
+  modules). All write operations require user approval.
+version: 1.1.0
 ---
 
-# unRAID Agent Skill v1.0.0
+# unRAID Agent Skill v1.1.0
 
-通过官方 GraphQL API + SSH 查询与管理 unRAID。**只读查询直接执行；一切写操作先展示摘要、等待用户确认，确认后才执行。**
+通过官方 GraphQL API 查询与管理 unRAID（SSH 可选，仅全功能模式）。**只读查询直接执行；一切写操作先展示摘要、等待用户确认，确认后才执行。**
+
+**部署模式**：默认「最小权限模式」= 仅 API 密钥（覆盖 90% 需求：只读查询 + 容器启停/更新）；「全功能模式」= API + SSH（额外 CA 部署/卸载、GPU、风扇、磁盘）。SSH 缺失时相关脚本自动提示并退出，不影响其余模块。
 
 ## 前置条件
 
 - unRAID 7.2+（实测 7.3.2，API 4.37.0）
 - API 密钥（ADMIN 角色，容器管理必需）：`~/.unraid/keys/<server>.key`（600 权限）
-- SSH 免密密钥：`~/.unraid/ssh/id_ed25519`（公钥已装 unRAID `/root/.ssh/authorized_keys`）
+- SSH 免密密钥（**可选，仅全功能模式**）：`~/.unraid/ssh/id_ed25519`（公钥装 unRAID `/root/.ssh/authorized_keys`）
 - 服务器 profile：`~/.unraid/profiles.json`（由 install.sh 生成，支持多台服务器）
 
 ## 命令清单（scripts/ 目录下执行）
@@ -56,14 +59,14 @@ version: 1.0.0
 4. **权限矩阵**：VIEWER=只读；CONNECT=Connect 功能（无 DOCKER 写）；容器管理必须 ADMIN
 5. 所有输出经 auth.redact 脱敏（密钥/密码/token 打码），审计不落敏感值
 6. unRAID < 7.2 提示 API 不可用，改用 WebGUI 人工操作
-7. 危险操作（关机/重启/阵列变更/格式化）不在 v1.0 范围，一律人工处理
+7. 危险操作（关机/重启/阵列变更/格式化）不在本工具范围，一律人工处理
 
 ## 已知环境事实（2026-08-09 实测，示例环境 unRAID 7.3.2）
 
 - API 端点：`http://<服务器IP>/graphql`（WebGUI 同源端口，非第三方容器端口）
 - 磁盘 size/fsFree 等 BigInt 字段单位是 **KB**（需 ×1024）
 - 容器 start/stop/restart/update 走 `docker { start/stop/restart/updateContainer }` mutation
-- API 无容器创建 mutation → 部署经 SSH + docker CLI（CA 模板生成命令 + dockerman 标签）
+- API 无容器创建 mutation → 部署经 SSH + docker CLI（CA 模板生成命令 + dockerman 标签；仅全功能模式）
 - whoami 等 CA v2 模板用 `<Config Type="Port">` 定义端口（新旧格式解析均已支持）
 - macvlan 隔离：宿主/经宿主转发的流量无法访问 macvlan 容器 → 用共享内部 bridge 网络（mp-net 方案）解决
 - nvidia runtime 容器静态 inspect Devices=[] 属正常，GPU 是否注入以容器内验证为准（info_gpu.py）

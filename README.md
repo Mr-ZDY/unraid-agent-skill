@@ -2,9 +2,9 @@
 
 # 🖥️ unRAID Agent Skill
 
-**让 AI Agent 通过官方 GraphQL API + SSH 查询与管理 unRAID**
+**让 AI Agent 通过官方 GraphQL API 查询与管理 unRAID（SSH 可选）**
 
-纯 Python 标准库 · 零 pip 依赖 · 一切写操作走确认门 + 审计
+纯 Python 标准库 · 零 pip 依赖 · 一切写操作走确认门 + 审计 · 默认最小权限（仅 API，不授 root/SSH）
 
 [![unRAID](https://img.shields.io/badge/unRAID-7.2%2B-blue)](https://docs.unraid.net)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB)](https://www.python.org)
@@ -46,8 +46,8 @@ AI Agent (Hermes / Claude / ...)
 └──────────────┬──────────────┘
        ┌───────┴────────┐
        ▼                ▼
-  GraphQL API        SSH (部署/GPU/风扇/磁盘)
-  (x-api-key)        (密钥认证)
+  GraphQL API        SSH（可选，仅全功能模式）
+  (x-api-key)        (部署/GPU/风扇/磁盘)
        │                │
        ▼                ▼
   unRAID 内置 API    Host OS (docker CLI / smartctl / lm-sensors)
@@ -62,11 +62,11 @@ AI Agent (Hermes / Claude / ...)
 git clone https://github.com/Mr-ZDY/unraid-agent-skill.git
 cd unraid-agent-skill
 
-# 2. 一键安装引导（交互式）
+# 2. 一键安装引导（交互式）——默认最小权限模式
 bash install.sh
 #    → 输入服务器地址
 #    → 粘贴 API 密钥（WebGUI：设置 → 管理访问 → API 密钥）
-#    → 安装 SSH 公钥（自动打印命令）
+#    → SSH 步骤直接回车跳过（最小权限，推荐）；需要 CA 部署/GPU/风扇/磁盘再选 y
 #    → 自动连通性验证
 
 # 3. 开始使用
@@ -74,7 +74,24 @@ cd scripts
 python3 info_system.py
 ```
 
-**环境要求**：unRAID 7.2+ · Python 3.10+ · SSH 客户端
+**环境要求**：unRAID 7.2+ · Python 3.10+ · SSH 客户端（仅全功能模式需要）
+
+---
+
+## 🧭 部署模式（二选一）
+
+> **最小权限模式【默认推荐】**：只配置 GraphQL API 密钥，不装 SSH、不授予 agent root。
+> 覆盖 **90% 以上日常需求**：全部只读查询 + 容器启停/重启/更新。适合绝大多数用户与自动化场景。
+
+| 模式 | 配置 | 能力 | 适合 |
+|---|---|---|---|
+| **🟢 最小权限**（默认） | API 密钥 | 9 个只读查询 + 容器管理（确认门） | 绝大多数用户；要求最小攻击面的生产环境 |
+| **🔵 全功能** | API 密钥 + SSH 密钥 | 最小权限全部 + CA 部署/卸载、GPU、风扇、磁盘通电时间 | 需要 agent 代部署 CA 应用；自托管重度用户 |
+
+**升级路径**：先用最小权限跑起来 → 确实需要 CA 部署 / GPU / 风扇 / 磁盘时，再运行
+`install.sh` 补配 SSH（生成密钥 → unRAID 装公钥 → 重启 install 或手动在 profiles.json 补 `ssh_key` 字段）。
+
+SSH 仅用于 4 个模块，**不配置时其余模块零影响**，且各脚本会明确提示当前为最小权限模式。
 
 ---
 
@@ -153,11 +170,12 @@ $ python3 op_deploy.py deploy whoami --port 9006 --yes   # CA 部署（确认门
 
 ## 🔐 安全设计
 
-1. **确认门**：写操作先展示摘要，显式确认才执行；无确认自动拒绝；全部审计到 `~/.unraid/audit.log`（600）
-2. **CA 来源铁律**：部署优先 Community Applications 官方应用；第三方必须用户明确许可
-3. **端口规则**：涉及新端口必须用户提供，同时列出已占用端口 + 推荐 3 个
-4. **输出脱敏**：密钥 / 密码 / token 自动打码，不落日志
-5. **多实例**：`profiles.json` 支持多台 unRAID 服务器
+1. **最小权限默认**：安装引导默认不配置 SSH（最小权限模式），agent 仅持有 GraphQL API 能力；SSH/root 是显式选择的全功能模式
+2. **确认门**：写操作先展示摘要，显式确认才执行；无确认自动拒绝；全部审计到 `~/.unraid/audit.log`（600）
+3. **CA 来源铁律**：部署优先 Community Applications 官方应用；第三方必须用户明确许可
+4. **端口规则**：涉及新端口必须用户提供，同时列出已占用端口 + 推荐 3 个
+5. **输出脱敏**：密钥 / 密码 / token 自动打码，不落日志
+6. **多实例**：`profiles.json` 支持多台 unRAID 服务器
 
 ## 🛡️ Threat Model（威胁模型）
 
@@ -165,8 +183,9 @@ $ python3 op_deploy.py deploy whoami --port 9006 --yes   # CA 部署（确认门
 |---|---|
 | **Prompt Injection**（Agent 被诱导执行危险操作） | 写操作全走确认门；SKILL.md 明示危险操作一律人工 |
 | **命令注入**（恶意容器名 / 参数） | `validate_name` 白名单校验；SSH 只执行代码内固定命令模板，**LLM 永不生成 shell** |
-| **权限越界**（只读会话拿到写能力） | API 密钥角色分级（VIEWER 只读 / ADMIN 管理）；`--compat` 校验 |
+| **权限越界**（只读会话拿到写能力） | API 密钥角色分级（VIEWER 只读 / ADMIN 管理）；`--compat` 校验；最小权限模式无 SSH 面 |
 | **Secret 泄露**（密钥进配置 / 日志 / 输出） | 密钥仅存 600 文件，配置只引用路径；输出经 auth.redact 脱敏；审计不含凭据 |
+| **横向入侵**（Agent 被攻破后利用 SSH/root 控制宿主） | 默认最小权限模式根本不存在 SSH 面；全功能模式才引入，且写操作仍走确认门 |
 | **供应链风险**（恶意第三方应用 / Skill 描述） | CA 来源分级强制提示；第三方安装必须用户显式许可 |
 | **版本漂移**（unRAID 升级导致 API 破坏） | `<7.2` 拒绝；`--compat` 字段级自检预警 |
 
@@ -193,8 +212,8 @@ $ python3 op_deploy.py deploy whoami --port 9006 --yes   # CA 部署（确认门
 |---|---|
 | `url` | unRAID GraphQL 端点（WebGUI 同源端口，如 `http://<IP>/graphql`） |
 | `key_file` | API 密钥文件路径（`install.sh` 写入，600 权限） |
-| `ssh_key` | SSH 私钥路径（部署 / GPU / 风扇 / 磁盘模块需要） |
-| `ssh_user` | SSH 登录用户（默认 root） |
+| `ssh_key` | SSH 私钥路径（**可选**，仅全功能模式；最小权限模式不配置此项） |
+| `ssh_user` | SSH 登录用户（默认 root，仅全功能模式） |
 | `verify_ssl` | 自签证书环境设 `false` |
 | `timeout` | 请求超时秒数 |
 
@@ -233,7 +252,7 @@ SSH 类模块（GPU / 风扇 / 磁盘）基于 smartctl / lm-sensors，**版本�
 
 ```
 unraid-agent-skill/
-├── install.sh          # 安装引导（服务器 / 密钥 / SSH / 验证）
+├── install.sh          # 安装引导（服务器 / 密钥 / SSH 可选 / 验证）
 ├── SKILL.md            # 技能声明（Agent 加载用）
 ├── SECURITY.md         # 安全说明 / 漏洞报告
 ├── CONTRIBUTING.md     # 贡献指南

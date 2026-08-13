@@ -41,26 +41,36 @@ printf '%s' "$API_KEY" > "$KEYS_DIR/$HOST.key"
 chmod 600 "$KEYS_DIR/$HOST.key"
 echo "✓ 密钥已保存: $KEYS_DIR/$HOST.key (600)"
 
-# ---------- 3. SSH 密钥 ----------
+# ---------- 3. SSH 密钥（可选，默认跳过 = 最小权限模式） ----------
 echo ""
-echo "=== 第 2 步: SSH 密钥（容器部署 / GPU / 风扇 / 磁盘模块需要）==="
-if [ ! -f "$SSH_DIR/id_ed25519" ]; then
-  ssh-keygen -t ed25519 -N "" -C "unraid-agent-skill" -f "$SSH_DIR/id_ed25519" >/dev/null 2>&1
-  echo "✓ 已生成: $SSH_DIR/id_ed25519"
-fi
-echo "在 unRAID WebGUI 终端执行以下命令安装公钥:"
-echo ""
-echo "  mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo '$(cat "$SSH_DIR/id_ed25519.pub")' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
-echo ""
-read -p "公钥安装完成了吗? (y/N): " SSH_OK
-if [ "$SSH_OK" != "y" ]; then
-  echo "⚠ 跳过 SSH 配置：部署/GPU/风扇/磁盘模块将不可用，其余模块不受影响"
+echo "=== 第 2 步(可选): SSH 密钥 ==="
+echo "最小权限模式【推荐】: 仅 GraphQL API(只读查询 + 容器启停/更新),不配置 SSH。"
+echo "  覆盖 90% 日常需求，且不授予 agent root/SSH 权限。"
+echo "全功能模式: 加 SSH 后额外获得 CA 部署 / GPU / 风扇 / 磁盘模块。"
+read -p "需要 SSH 全功能模式吗? (y/N): " SSH_OPT
+if [ "$SSH_OPT" = "y" ] || [ "$SSH_OPT" = "Y" ]; then
+  if [ ! -f "$SSH_DIR/id_ed25519" ]; then
+    ssh-keygen -t ed25519 -N "" -C "unraid-agent-skill" -f "$SSH_DIR/id_ed25519" >/dev/null 2>&1
+    echo "✓ 已生成: $SSH_DIR/id_ed25519"
+  fi
+  echo "在 unRAID WebGUI 终端执行以下命令安装公钥:"
+  echo ""
+  echo "  mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo '$(cat "$SSH_DIR/id_ed25519.pub")' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
+  echo ""
+  read -p "公钥安装完成了吗? (y/N): " SSH_OK
+  if [ "$SSH_OK" != "y" ]; then
+    echo "⚠ 跳过 SSH 配置：保持最小权限模式（部署/GPU/风扇/磁盘模块不可用）"
+    SSH_OPT=""
+  fi
+else
+  echo "✓ 最小权限模式：不配置 SSH（只读查询 + 容器管理已覆盖 90% 需求）"
+  SSH_OPT=""
 fi
 
 # ---------- 4. 写入 profiles.json ----------
-python3 - "$NAME" "$URL" "$HOST" << 'EOF'
+python3 - "$NAME" "$URL" "$HOST" "$SSH_OPT" << 'EOF'
 import sys, os, json
-name, url, host = sys.argv[1], sys.argv[2], sys.argv[3]
+name, url, host, ssh_opt = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 conf_dir = os.path.expanduser("~/.unraid")
 pf = os.path.join(conf_dir, "profiles.json")
 profiles = {}
@@ -69,14 +79,16 @@ if os.path.exists(pf):
         profiles = json.load(open(pf))
     except Exception:
         profiles = {}
-profiles[name] = {
+p = {
     "url": url,
     "key_file": os.path.join(conf_dir, "keys", f"{host}.key"),
-    "ssh_key": os.path.join(conf_dir, "ssh", "id_ed25519"),
-    "ssh_user": "root",
     "verify_ssl": False,
     "timeout": 15,
 }
+if ssh_opt:
+    p["ssh_key"] = os.path.join(conf_dir, "ssh", "id_ed25519")
+    p["ssh_user"] = "root"
+profiles[name] = p
 with open(pf, "w", encoding="utf-8") as f:
     json.dump(profiles, f, ensure_ascii=False, indent=2)
 os.chmod(pf, 0o600)

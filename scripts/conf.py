@@ -21,7 +21,8 @@ DEFAULT_PROFILES = {}  # 由 install.sh 或 conf.py add 生成，禁止硬编码
 # profile 字段说明：
 #   url        GraphQL 端点，如 http://192.0.2.100/graphql
 #   key_file   API 密钥文件路径（默认 <KEYS_DIR>/<host>.key）
-#   ssh_key    SSH 私钥路径（默认 <SSH_DIR>/id_ed25519）
+#   ssh_key    SSH 私钥路径（可选。仅 CA 部署/GPU/风扇/磁盘模块需要；
+#              最小权限模式【默认推荐】不配置此项）
 #   ssh_user   SSH 用户（默认 root）
 #   verify_ssl 自签证书时 False
 #   timeout    请求超时（秒）
@@ -70,27 +71,40 @@ def add_profile(name: str, url: str, key_file: str | None = None,
                 verify_ssl: bool = False) -> None:
     host = re.sub(r"^https?://([^/:]+).*$", r"\1", url)
     profiles = load_profiles()
-    profiles[name] = {
+    p = {
         "url": url,
         "key_file": key_file or os.path.join(KEYS_DIR, f"{host}.key"),
-        "ssh_key": ssh_key or os.path.join(SSH_DIR, "id_ed25519"),
         "ssh_user": ssh_user,
         "verify_ssl": verify_ssl,
         "timeout": 15,
     }
+    # ssh_key 可选：不传 = 最小权限模式（仅 GraphQL API，推荐）
+    if ssh_key:
+        p["ssh_key"] = ssh_key
+    profiles[name] = p
     save_profiles(profiles)
 
 
 def get_ssh(name: str = "prod") -> dict:
-    """返回 SSH 连接配置 {host, user, key}，从 profile 解析。"""
+    """返回 SSH 连接配置 {host, user, key}，从 profile 解析。
+
+    最小权限模式（未配置 ssh_key）时 key 为 None，调用方应优雅降级。
+    """
     p = get_profile(name)
     url = p["url"]
     host = re.sub(r"^https?://([^/:]+).*$", r"\1", url)
     return {
         "host": host,
         "user": p.get("ssh_user", "root"),
-        "key": p.get("ssh_key", os.path.join(SSH_DIR, "id_ed25519")),
+        "key": p.get("ssh_key") or None,
     }
+
+
+def ssh_available(name: str = "prod") -> bool:
+    """SSH 是否可用。最小权限模式（未配置密钥或文件缺失）返回 False。"""
+    p = get_profile(name)
+    key = p.get("ssh_key")
+    return bool(key) and os.path.exists(key)
 
 
 def main():
@@ -102,7 +116,7 @@ def main():
     add.add_argument("name")
     add.add_argument("url")
     add.add_argument("--key", dest="key_file", help="API 密钥文件（默认 ~/.unraid/keys/<host>.key）")
-    add.add_argument("--ssh-key", dest="ssh_key", help="SSH 私钥（默认 ~/.unraid/ssh/id_ed25519）")
+    add.add_argument("--ssh-key", dest="ssh_key", help="SSH 私钥（可选，仅全功能模式；不传 = 最小权限）")
     add.add_argument("--ssh-user", default="root")
     add.add_argument("--no-verify-ssl", action="store_true")
     args = ap.parse_args()

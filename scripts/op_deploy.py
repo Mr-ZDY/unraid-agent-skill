@@ -45,9 +45,7 @@ FEED_URL = "https://raw.githubusercontent.com/Squidly271/AppFeed/master/applicat
 CACHE_FILE = os.path.expanduser("~/.unraid/cache/appfeed-small.json")
 CACHE_MAX_AGE = 12 * 3600  # 12 小时刷新
 
-# SSH 自动执行配置（测试2验证通过 2026-08-09）
-SSH_KEY = os.path.expanduser("~/.unraid/ssh/id_ed25519")
-SSH_USER = "root"
+# SSH 自动执行配置（测试2验证通过 2026-08-09；实际密钥路径取自 profile conf.get_ssh）
 
 # 非容器系统服务占用端口（WebGUI 等，API 容器端口列表查不到）
 SYSTEM_PORTS = [80, 443]
@@ -203,8 +201,11 @@ def recommend_ports(occupied: list[int], count: int = 3) -> list[int]:
 def ssh_exec(server: str, command: str) -> tuple[int, str]:
     """通过 SSH 在 unRAID 上执行命令（密钥认证，无需密码）。配置取自 profile。"""
     cfg = unraid_api.conf.get_ssh(server)
-    if not os.path.exists(cfg["key"]):
-        raise RuntimeError(f"SSH 密钥不存在: {cfg['key']}（部署需 SSH 自动执行，见 install.sh）")
+    if not cfg["key"] or not os.path.exists(cfg["key"]):
+        raise RuntimeError(
+            "最小权限模式（未配置 SSH）：CA 部署需要 SSH 自动执行。\n"
+            "  当前 profile 仅 GraphQL API 能力；如需 CA 部署，见 README「部署模式」章节配置 SSH。"
+        )
     cmd = ["ssh", "-i", cfg["key"], "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes",
            "-o", "ConnectTimeout=8", f"{cfg['user']}@{cfg['host']}", command]
     p = subprocess.run(cmd, capture_output=True, text=True, timeout=120)

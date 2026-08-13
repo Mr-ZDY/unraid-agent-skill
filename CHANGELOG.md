@@ -2,6 +2,22 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [v1.1.0] - 2026-08-13
+
+### 新增
+- **最小权限模式【默认推荐】**：SSH 改为可选。仅配置 GraphQL API 密钥即可使用全部只读查询 + 容器启停/重启/更新（覆盖 90% 以上需求），不再默认授予 agent root/SSH
+- 部署模式二选一：🟢 最小权限（仅 API）/ 🔵 全功能（API + SSH，额外 CA 部署/卸载、GPU、风扇、磁盘）
+- `conf.py` 新增 `ssh_available()`；`ssh_key` 字段改为可选（缺省 = 最小权限模式）
+- SSH 模块优雅降级：最小权限模式下 info_gpu / info_fan / info_disks / op_deploy 明确提示并退出，其余模块零影响
+
+### 安全
+- 威胁模型新增「横向入侵」防护：默认无 SSH 面，agent 被攻破也无法控制宿主
+
+### 文档
+- README 新增「部署模式」章节 + 快速开始默认最小权限 + 升级路径
+- SECURITY.md 权限建议重写（最小权限默认 / SSH 面最小化）
+- SKILL.md / install.sh / CHANGELOG 同步
+
 ## [v1.0.0] - 2026-08-09
 
 ### 新增
